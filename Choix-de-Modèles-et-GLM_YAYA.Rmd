@@ -1,0 +1,1021 @@
+---
+title: 'Choix de Modèles et Modèles Linéaires Généralisés '
+author: "YAYA Ousman"
+date: "2024-06-08"
+output:
+  
+  pdf_document: 
+    toc: true
+    toc_depth: 4
+    number_sections: true
+    highlight: zenburn
+  html_document: 
+    toc: true
+    number_sections: true
+---
+
+<style type="text/css">
+body{ /* Normal  */
+font-size: 12px;
+}
+td {  /* Table  */
+font-size: 12px;
+}
+h1.title {
+font-size: 26px;
+color: Blue;
+}
+
+h1 { /* Header 1 */
+font-size: 20px;
+color: Blue;
+}
+h2 { /* Header 2 */
+font-size: 16px;
+color: Blue;
+}
+h3 { /* Header 3 */
+font-size: 14px;
+font-family: "Times New Roman", Times, serif;
+color: Blue;
+}
+</style>
+
+<style>
+#TOC {
+  color: Blue; 
+}
+
+</style>
+
+
+
+```{r setup, include=FALSE,echo=FALSE}
+library(ggplot2)
+library(corrplot)
+library(ggcorrplot)
+library(caret)
+library(pROC)
+library(gains)
+library(tidyverse)
+library(kableExtra)
+library(MASS)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+```
+
+
+##  Objectifs
+
+Utiliser un GLM pour prédire si il pleuvra le jour suivant en utilisant les données météorologiques disponibles(température, pression, nébulosité, vent,humidité etc.) sur la ville de Bâle de $2010 \ à \ 2018$ ce qui veut-dire autrement,expliquer la vriable d'intérêt $pluie\ du\ lendemain$ en fonction des observations.
+
+# PARTIE I : Exploration des données
+
+### I.1. Téléchargement et exploration des données
+
+Ci-dessous le jeu de données à etudier.
+
+```{r,meteo,echo=FALSE}
+meteo <- read.csv("~/Desktop/Module 2/Modèles linéaires généralisés/Projet/meteo.train.csv", header=TRUE,sep= ",")
+
+```
+
+
+### I.2 Exploration des statistiques descriptives
+
+Nous essayons de savoir plus sur notre jeu de donnéees avec les fonction comme summary,head,str etc.
+
+### I.2.1 Les prémières lignes de données
+
+On affiche les six prémières lignes de données avec la fonction head.
+
+```{r,eval=FALSE,echo=TRUE}
+# Afficher les premières lignes du dataframe
+head(meteo)
+```
+
+Les résultats sur les six premières lignes nous informent que les données sont enregistrées tous les deux jours en juin 2010 avec des détails suivants :
+
+Température : Variabilité visible de 14.99°C à 22.64°C.
+Humidité Relative : Moyenne autour de 70-77%.
+Pression Atmosphérique : Moyenne de 1003.81 hPa à 1017.26 hPa.
+Précipitations : Varient de 0 mm à 3.7 mm.
+Vitesse du Vent : Variations importantes, max de 22.71 m/s.
+Pluie le Lendemain : Indique des jours de pluie suivants.
+Ces premières lignes montrent une variabilité climatique significative utile pour la modélisation.
+
+### I.2.2 Les dernières lignes de données
+
+On peut également afficher les dernères lignes de données
+
+```{r,eval=FALSE,echo=TRUE}
+tail(meteo)
+```
+
+Contrairement à l'entête, les dernières lignes montrent une Température : Moyenne stable autour de 18-21°C, indiquant des températures modérées en fin de printemps et début d'été.
+Humidité Relative : Généralement élevée (70-78%), influençant potentiellement les conditions de confort.
+Pression Atmosphérique : Relativement stable entre 1003.91 hPa et 1013.19 hPa, typique de cette période de l'année. Précipitations : Peu fréquentes, avec des précipitations maximales de 1.8 mm, suggérant une période relativement sèche. Vitesse du Vent : Variations notables avec des pointes jusqu'à 40.91 m/s à 900 mb, reflétant des conditions venteuses occasionnelles. Pluie le Lendemain : Pas de pluie prévue dans ces enregistrements, indiquant une période de temps sec.
+Ces observations finales renforcent l'idée d'une période avec des conditions météorologiques stables et relativement sèches, utile pour la modélisation prédictive.
+
+### I.2.3 Caractéristiques de données
+
+```{r,eval=FALSE,echo=TRUE}
+str(meteo)
+```
+
+Le jeu de données est composé de 1180 observations et 47 variables au total,en majorité numériques (int, num).Les données météorologiques sont :Température, humidité, pression, précipitations, vent etc. c'est un jeu de données  complèt et varié donc  idéal pour des analyses météorologiques et prédictives.
+
+### I.2.4 Résumé golobal avec la fonction summary
+
+Nous affichons ci-dessous le résumé de notre jeu de données.
+
+```{r,eval=FALSE,echo=TRUE}
+summary(meteo)
+```
+
+Le résulat de summary montre une température moyenne journalière de variabilité significative (2.21°C à 29.97°C), indiquant une forte saisonnalité,l'humidité relative moyenne est énéralement élevée (37.70% à 93.18%), influençant le confort thermique,la pression atmosphérique moyenne est stable autour de 1012 hPa, ,les précipitations journalières montrent que la majorité des jours sont sans pluie (médiane à 0.20 mm), mais quelques épisodes de fortes précipitations donc les observations montrent une forte variabilité saisonnière et des épisodes de pluie rares mais intenses.
+
+### I.2.4 Conclusion: 
+
+Cette partie sur l'analyses descriptives, nous montre que le jeu de données est très riche pour méner des etudes métrologiques et prédictives. On constate qu'il y a cependant quelques variables (par ex: Hour,Minute et X) qui n'apportent pas d'information en terme de contribution dans l'etude et qui peuvent êtres supprimées. 
+
+### 1.2.5 Reorganisation de données
+
+Nous allons dans cette section, renommer les noms des variables pour faciliter la rédaction de ce projet et mieux s'approprier le jeu de données.
+
+```{r,echo=FALSE}
+names(meteo)[names(meteo) == "X"] <- "X"
+names(meteo)[names(meteo) == "Year"] <- "Year"
+names(meteo)[names(meteo) == "Month"] <- "Month"
+names(meteo)[names(meteo) == "Day"] <- "Day"
+names(meteo)[names(meteo) == "Hour"] <- "Hour"
+names(meteo)[names(meteo) == "Minute"] <- "Minute"
+names(meteo)[names(meteo) == "High.Cloud.Cover.daily.max..high.cld.lay."] <- "High.cloud.max"
+names(meteo)[names(meteo) == "High.Cloud.Cover.daily.mean..high.cld.lay."] <- "High.cloud.mean"
+names(meteo)[names(meteo) == "High.Cloud.Cover.daily.min..high.cld.lay."] <- "High.cloud.min"
+names(meteo)[names(meteo) == "Low.Cloud.Cover.daily.max..low.cld.lay."] <- "Low.cloud.max"
+names(meteo)[names(meteo) == "Low.Cloud.Cover.daily.mean..low.cld.lay."] <- "Low.cloud.mean"
+names(meteo)[names(meteo) == "Low.Cloud.Cover.daily.min..low.cld.lay."] <- "Low.cloud.min"
+names(meteo)[names(meteo) == "Mean.Sea.Level.Pressure.daily.max..MSL."] <- "Press.max"
+names(meteo)[names(meteo) == "Mean.Sea.Level.Pressure.daily.mean..MSL."] <- "Press.mean"
+names(meteo)[names(meteo) == "Mean.Sea.Level.Pressure.daily.min..MSL."] <- "Press.min"
+names(meteo)[names(meteo) == "Medium.Cloud.Cover.daily.max..mid.cld.lay."] <- "Med.cloud.max"
+names(meteo)[names(meteo) == "Medium.Cloud.Cover.daily.mean..mid.cld.lay."] <- "Med.cloud.mean"
+names(meteo)[names(meteo) == "Medium.Cloud.Cover.daily.min..mid.cld.lay."] <- "Med.cloud.min"
+names(meteo)[names(meteo) == "Relative.Humidity.daily.max..2.m.above.gnd."] <- "Hum.max"
+names(meteo)[names(meteo) == "Relative.Humidity.daily.mean..2.m.above.gnd."] <- "Hum.mean"
+names(meteo)[names(meteo) == "Relative.Humidity.daily.min..2.m.above.gnd."] <- "Hum.min"
+names(meteo)[names(meteo)== "Shortwave.Radiation.daily.sum..sfc."] <- "Radiation"
+names(meteo)[names(meteo) == "Snowfall.amount.raw.daily.sum..sfc."] <- "Snowfall"
+names(meteo)[names(meteo) == "Sunshine.Duration.daily.sum..sfc."] <- "Sunshine"
+names(meteo)[names(meteo) == "Temperature.daily.max..2.m.above.gnd."] <- "Temp.max"
+names(meteo)[names(meteo) == "Temperature.daily.mean..2.m.above.gnd."] <- "Temp.mean"
+names(meteo)[names(meteo) == "Temperature.daily.min..2.m.above.gnd."] <- "Temp.min"
+names(meteo)[names(meteo) == "Total.Cloud.Cover.daily.max..sfc."] <- "Total.cloud.max"
+names(meteo)[names(meteo) == "Total.Cloud.Cover.daily.mean..sfc."] <- "Total.cloud.mean"
+names(meteo)[names(meteo) == "Total.Cloud.Cover.daily.min..sfc."] <- "Total.cloud.min"
+names(meteo)[names(meteo) == "Total.Precipitation.daily.sum..sfc."] <- "Precipitation"
+names(meteo)[names(meteo) == "Wind.Direction.daily.mean..10.m.above.gnd."] <- "Wind.direc.10.m"
+names(meteo)[names(meteo) == "Wind.Direction.daily.mean..80.m.above.gnd."] <- "Wind.direc.80.m"
+names(meteo)[names(meteo) == "Wind.Direction.daily.mean..900.mb."] <- "Wind.direc.900.m"
+names(meteo)[names(meteo) == "Wind.Gust.daily.max..sfc."] <- "Gust.max"
+names(meteo)[names(meteo) == "Wind.Gust.daily.mean..sfc."] <- "Gust.mean"
+names(meteo)[names(meteo) == "Wind.Gust.daily.min..sfc."] <- "Gust.min"
+names(meteo)[names(meteo) == "Wind.Speed.daily.max..10.m.above.gnd."] <- "Wind.speed.10m.max"
+names(meteo)[names(meteo) == "Wind.Speed.daily.max..80.m.above.gnd."] <- "Wind.speed.80.max"
+names(meteo)[names(meteo) == "Wind.Speed.daily.max..900.mb."] <- "Wind.speed.900.max"
+names(meteo)[names(meteo) == "Wind.Speed.daily.mean..10.m.above.gnd."] <- "Wind.speed.10m.mean"
+names(meteo)[names(meteo) == "Wind.Speed.daily.mean..80.m.above.gnd."] <- "Wind.speed.80m.mean"
+names(meteo)[names(meteo) == "Wind.Speed.daily.mean..900.mb."] <- "Wind.speed.900m.mean"
+names(meteo)[names(meteo) == "Wind.Speed.daily.min..10.m.above.gnd."] <- "Wind.speed.10m.min"
+names(meteo)[names(meteo) == "Wind.Speed.daily.min..80.m.above.gnd."] <- "Wind.speed.80m.min"
+names(meteo)[names(meteo) == "Wind.Speed.daily.min..900.mb."] <- "Wind.speed.900m.min"
+names(meteo)
+```
+
+### I.2.6 Supprimer les colonnes inutiles
+
+On supprime les variables (X, Hour et Minute) qui n'apportent pas d'information importante.
+
+```{r,echo=FALSE}
+# Supprimer les colonnes inutiles (X, Hour, Minute)
+met <- meteo[, !names(meteo) %in% c("X", "Hour", "Minute")]
+
+```
+
+Voici notre nouvel object (meteo) sans les variables **X**,**Hour** et **Minute**.
+
+```{r}
+names(met)
+```
+### Visualisation graphiques entre quelques variables et la pluie de lendemain
+
+Visualisons les liens entre quelques variables choisies par intuition comme la taux d'humidité(Hum.max), la temperature(Tem.mean) ,la pression maximale(Press.max) et precipitataion.
+
+```{r}
+par(mfrow=c(1,2))
+df <- met
+# Créer les boxplots avec des couleurs et ajouter une légende
+ggplot(df, aes(x = as.factor(pluie.demain), y = Hum.max, fill = as.factor(pluie.demain))) +
+  geom_boxplot(alpha = 0.7) + # Ajouter les boxplots avec transparence
+  theme_minimal() + # Appliquer un thème minimaliste
+  labs(title = "Boxplots entre pluie.demain et Hum.max", # Ajouter un titre
+       x = "Pluie demain", # Label de l'axe x
+       y = "Humidité maximale", # Label de l'axe y
+       fill = "Pluie demain") + # Ajouter une légende
+  scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "blue")) # Personnaliser les couleurs
+
+# Créer des sous-ensembles de données pour TRUE et FALSE
+df_true <- subset(df, pluie.demain == TRUE)
+df_false <- subset(df, pluie.demain == FALSE)
+
+# Afficher l'histogramme de Hum.max pour TRUE et FALSE
+hist(df_false$Hum.max, main = "Histogramme de Hum.max", xlab = "Hum.max", col = "blue", border = "black", xlim = range(df$Hum.max), ylim = c(0, max(hist(df$Hum.max, plot = FALSE)$counts) * 1.2), breaks = 20)
+hist(df_true$Hum.max, col = rgb(1, 0, 0, 0.5), border = "black", add = TRUE, breaks = 20) # Superposer l'histogramme pour TRUE
+
+# Ajouter une légende
+legend("topright", legend = c("FALSE", "TRUE"), fill = c("blue", rgb(1, 0, 0, 0.5)), border = "black", title = "Pluie demain")
+
+```
+
+On peut observer dans le graphe de boxplot ainsi que l'histogramme que la variables l'humidité maximale (Hum.max) ne nous renseigne pas avec exactitude qu'il va pleuvoir le lendemain ou ,car la distribution est identique et il peut pleuvoir à un taux d'humidité de 60% comme à 100% par contre l'histogramme se montre davantage claire,on observe les pluies à partir de 80%, cela laisse penser que la pluie de lendemain est influencée par des taux d'humidité importants(>80% ) à la veille.
+
+### Entre le pression et la pluie de lendemain et la température moyenne et la pluie de lendemain.
+
+Le couple à étudier etant du type quantitatif/qualitatif,on privilégie le boxplot. et Voici les graphes.
+
+```{r fig.show ="hold", out.width = "50%", fig.width = 8}
+par(mfrow=c(1,2))
+ggplot(met, aes(x=pluie.demain, y= Press.max)) + geom_boxplot()
+ggplot(met, aes(x=pluie.demain, y= Temp.mean)) + geom_boxplot()
+```
+
+Les differences sont faibles dans le prémier cas,on peut toutefois noter qu'il a plu lorsque la température de la veille etait plus élèvée en moyenne. Par contre, il y a bien un effet pression maximale sur la pluie de lendemain.
+
+
+### Entre la precipitation et la pluie de lendemain
+
+```{r}
+ggplot(met, aes(x=pluie.demain, y=Precipitation)) + geom_boxplot()
+hist(met$Precipitation)
+```
+
+On peut observer dans l'histogramme ci-essous une concentration des observations vers la gauche, ce qui indique que la majorité des valeurs de la variable precipitation sont regroupées à des niveaux inférieurs. Néanmoins, le boxplot révèle que la variable precipitation semble fournir des indications sur la variable pluie.demain.
+Cette interprétation suggère que les observations où pluie.demain est égal à TRUE ont tendance à présenter des niveaux de précipitation supérieurs à zéro. Cela signifie qu’il y a une relation positive entre la variable precipitation et la probabilité qu’il pleuve le lendemain.
+
+### I.2.7 Matrice de corrélation pour les covariables
+Nous avons eu l'idée de tracer les graphes(boxplot,nuages des points etc.) pour identifier les covariables qui fournissent à peu près les mêmes informations,mais on se rend compte que cela n'est pas très productif(trop de graphes) donc nous mettons en place une matrice de correlation pour visualiser rapidement les variables qui sont fortement corréllées entre elles(*corrélation >=0.8*),ce qui nous permettra de faire des choix concernant les covariables à retenir pour construire notre modèle.
+
+
+```{r,echo=FALSE}
+# Calculer la matrice de corrélation pour les covariables
+covariables <- met[, !names(met) %in% c("pluie.demain")] # Exclure la variable dépendante
+corr_matrix <- cor(covariables, use = "complete.obs")
+
+# Garder seulement les corrélations > 0.8
+corr_matrix[abs(corr_matrix) <= 0.8] <- 0
+
+# Visualiser la matrice de corrélation
+corrplot(corr_matrix, method = "circle", type = "upper", tl.cex = 0.7, tl.col = "black", order = "hclust")
+```
+
+La figure nous renseigne entre autre que la température maximale (Temp.max) et la température moyenne (Temp.mean) montrent une corrélation très élevée. La température minimale (Temp.min) et la température moyenne (Temp.mean) ont une forte corrélation positive. 
+Une forte corrélation positive existe egalement entre la pression maximale (Press.max) et la pression moyenne (Press.mean). 
+L'humidité maximale (Hum.max) et l'humidité moyenne (Hum.mean) sont fortement corrélées, ce qui signifie que les jours avec une humidité moyenne plus élevée ont aussi des humidités maximales plus élevées. Cela montre une forte dépendance de l'humidité maximale à l'humidité moyenne. La vitesse maximale du vent à 10 mètres (Wind.speed.10m.max) et la vitesse moyenne du vent à 10 mètres (Wind.speed.10m.mean) montrent une forte corrélation positive également.La vitesse maximale du vent à 80 mètres (Wind.speed.80.max) et la vitesse moyenne du vent à 80 mètres (Wind.speed.80m.mean) sont également fortement corrélées. Cela indique une cohérence dans les mesures de vitesse du vent à cette altitude.
+
+
+# Partie II: Pluie de lendemain
+
+Dans cette partie, nous allons essayer d'expliquer la variable $pluie.demain$ en fonction des données récoltées. C'est une variable binaire (avec la convention 1 = TRUE et 0 = FALSE).
+Nous allons effectuer un GLM pour proposer un modèle permettant à la fois d'expliquer les données, mais également de prédire s'il pleuvra ou non le lendemain.
+
+
+### Construction de modèles
+
+Nous lancons un prémier modèle complexe pour identifier les covariables significatives
+
+```{r}
+pluie0 = glm(pluie.demain ~.,family = binomial ,data = met)
+summary(pluie0)
+```
+
+###  Interpretation des coefficients du modèle complet: 
+
+Désormais c'est la "log côte anglaise des $p_i$" qui est directement interpératable,ca veut-dire que lorque le coefficient est positif, la probabilité qu'il pleuve le lendemain augmente et réciproquement).
+
+* à titre d'interprétation, le coefficient de $Prmax$ est négatif ("-2.587e-01") et est fortement significatif.
+On retrouve bien le fait que $pluie.demain$ et $Prmax$ sont "fortement liées".
+Plus précisemment, quand la pression maximale augmente d'une unité, la probabilité qu'il pleuve le lendemain diminue (car le coefficient est négatif) et est multipliée par $\frac{e^{-0.2587}}{1+e^{-0.2587}}$.
+
+* On remarque contrairemnt à la pression maximale, que la pression moyenne (Press.mean) est un predicateur très significatif de la pluie de lendemain avec un coefficient estimé (5.124e-01) ce qui signifie en termes de log-odds que chaque augmentation d'une unité de la pression moyenne augmente les log-odds de la pluie du lendemain de 0.5124.
+
+ * c'est en revanche le phénomène inverse pour la température moyenne, puisque, cette fois-ci, le coefficient est positif ("1.830e-01") et n'est pas significatif.
+ 
+
+### Selection d'un prémier modèle (pluie1)
+
+On remarque dans le modèle complet que beaucoup de covariables ne sont pas significatives(p-valeur >0.05) donc nous allons tenter une prémière approche en commencant par un modèle avec des covariables choisies par notre intuitions puis les supprimer progressivement en fonction de leurs non utilités dans le modèle.
+
+```{r,eval=FALSE,echo=TRUE}
+pluie1 = glm(pluie.demain~Year+Month+Day+Temp.mean+ Press.mean+Precipitation+Snowfall+Total.cloud.mean+
+High.cloud.mean+Med.cloud.mean+Low.cloud.mean+Sunshine+Radiation+Wind.speed.10m.mean
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.80m.min+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+summary(pluie1)
+
+```
+
+On constate que le modèle pluie1,consruit à partir de 25 variables ne se montre pas plus efficace,avec un **AIC:1335.8** ,plus important par rapport au modèle complexe(global) avec un **AIC: AIC: 1320.7** et l'intercept n'est pas significatif. On regarde un deuxième modèle en retirant deux variables (month etHigh.cloud.mean  ).
+
+```{r,eval=FALSE,echo=TRUE}
+# on retire les variables "Month+High.cloud.mean"
+pluie2 = glm(pluie.demain~Year+Day+Temp.mean+ Press.mean+Precipitation+Snowfall+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Sunshine+Radiation+Wind.speed.10m.mean
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.80m.min+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+summary(pluie2)
+```
+
+Ce modèle (pluie2) est également non satisfaisasnt et l'intercept est toujours non significatif, mais on gagne en terme de **AIC: 1332.6** ,cela peut-être interessant,mais on continue notre demarche de reduction des variables et on retire les variables(Day+Snowfall).
+
+```{r,eval=FALSE,echo=TRUE}
+# on retire les variables"Day+Snowfall"
+pluie3 = glm(pluie.demain~Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Sunshine+Radiation+Wind.speed.10m.mean
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.80m.min+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+summary(pluie3)
+```
+
+On gagne encore en terme de **AIC: 1331.7** ,mais il y a encore beaucoup de variables non significatives et l'intercept n'est toujours pas significatif. On essaye de l'enlever pour observer le comportement du modele.
+
+```{r,eval=FALSE,echo=TRUE}
+# Modele sans l'intercept
+pluie3b = glm(pluie.demain~-1+Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Sunshine+Radiation+Wind.speed.10m.mean
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.80m.min+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+summary(pluie3b)
+```
+On constate une evolution encore en terme de AIC et on constate egalement que la variable Year qui etait à la limite de significativité avec une **p-valeur : 0.05902** devient très significative avec une **p-valeur: 1.53e-07** et un coeiffient postif en suggerant que cette variable influence la pluie de lendemain,mais on conclue que cette approche savère infructueux c'est pourquoi nous decidons de réprendre le modèle avec l'intercept et reprenons notre demarche de retrait des variables qui semblent ne pas avoir un apport important dans la pluie de lendemain et on retire les variables(unshine+Wind.speed.10m.mean+Wind.speed.80m.min).
+
+
+```{r,eval=FALSE,echo=TRUE}
+# On retire les variables"Sunshine+Wind.speed.10m.mean+Wind.speed.80m.min
+pluie4 = glm(pluie.demain~Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Radiation
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+summary(pluie4)
+```
+L'AIC evolue toujours,mais il existe encore quelques variables qu'on peut retirer en se basant sur leurs impact **p-valeurs** pour améliorer le modèle.
+On retire qu'une seule variables cette fois,car en retirant en même temps deux ou trois variables,on peut perdre une information importante même si ces dernères ne sont pas significatives donc on retire que la variable(Wind.speed.900m.min).
+
+```{r,eval=FALSE,echo=TRUE}
+# on retire la variable Wind.speed.900m.min
+pluie4.1 = glm(pluie.demain~Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Radiation
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.900.max
+ ,family = binomial,data = met)
+summary(pluie4.1)
+```
+
+Le résultats est encourageant ,on améliore encore **AIC: 1326.4** et beaucoup de variables sont significatives,mais nous reprenons notre demarche de depart pour faire tomber encore les variables qui n'ont pas d'impact dans le modèle,car si on retire que un à un les variables,on risque de construire un nombre très important de modèles avant de tomber sur un qui est satisfaisant.
+
+```{r,eval=FALSE,echo=TRUE}
+# on retire les variables"Low.cloud.mean+Wind.direc.10.m+Wind.speed.80.max+Wind.speed.900m.mean
+pluie5 = glm(pluie.demain~Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Radiation
++Wind.speed.80m.mean+Wind.direc.80.m+
+Wind.direc.900.m+Wind.speed.10m.max
++Wind.speed.900.max+Wind.speed.10m.min
+ ,family = binomial,data = met)
+summary(pluie5)
+```
+
+Au dela de **AIC: 1324.4** le modele semble satisfaisant hormis la variable precipitation qui demeure non significative et les variales Year et Wind.speed.900.max qui sont à la limite de significativité. Nous retirons la variable Year et ajoutons par intuitions l'humidité maximale(Hum.max).
+
+```{r,eval=FALSE,echo=TRUE}
+
+pluie6 = glm(pluie.demain~ -Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Radiation+ Hum.max
++Wind.speed.80m.mean+Wind.direc.80.m+
+Wind.direc.900.m+Wind.speed.10m.max
++Wind.speed.900.max+Wind.speed.10m.min
+ ,family = binomial,data = met)
+summary(pluie6)
+```
+
+Cette operation a permis de rendre significatif l'intercet,mais certaines variables sont non significatives et donc on peut continuer faire tomber certaines variables encore.
+
+```{r,eval=FALSE,echo=TRUE}
+# on retire "+Wind.speed.900.max+Radiation
+pluie7 = glm(pluie.demain~Temp.mean+Temp.min+Press.mean+Total.cloud.mean+
+Med.cloud.mean
++Wind.speed.80m.mean+Wind.direc.80.m+
+Wind.direc.900.m+Wind.speed.10m.max
++Wind.speed.10m.min
+ ,family = binomial,data = met)
+summary(pluie7)
+```
+Le modèle (pluie7 ), composé des variables: Temp.mean ,Temp.min ,Press.mean ,Total.cloud.mean ,Med.cloud.mean ,Wind.speed.80m.mean,Wind.direc.80.m ,Wind.direc.900.m ,Wind.speed.10m.max ,Wind.speed.10m.min peut être validé comme modèle de travail. Il detient un AIC faible et toutes les variables sont significatives y compris l'intercept.
+Voici ci-dessous un tableau recaptilatif résumant les covariables intervenant dans les modeles les plus importants ainsi que leus p-valeurs respectives.
+
+### Tableau recaptilatif de modèles.
+
+covariables |$pluie4$|$pluie4.1$|$pluie5$|$pluie6$|$pluie7$|
+------------|-------|-------|----- |-------|-------|
+(Intercept)|0.345117  |0.342486  |0.370177|4.48e-07|2.33e-07 |
+Temp.mean|	0.029198	|0.030848 |0.015602|0.018978 |0.000320
+Temp.min	|	|||0.072313|0.011416
+Press.mean|4.15e-08 	|3.79e-08|3.30e-08 |7.00e-08 |3.63e-08
+Total.cloud.mean|0.009305  | 0.009819| 0.006673 | 0.003728	| 0.006509	|
+Med.cloud.mean	|0.102717  |0.097006|0.002650	|  0.003629  |0.002025
+Wind.speed.80m.mean 	|0.000126|0.000135|0.000401|0.000249|0.000252
+Wind.direc.80.m	|0.072534|0.073035|0.006938|0.035660|0.043274 
+Wind.direc.900.m 	|1.28e-05|1.25e-05|1.69e-05|1.51e-05|6.39e-06|
+Wind.speed.10m.max  	|0.047763 	|0.048435  |0.000170|7.57e-05|1.22e-06
+Wind.speed.10m.min	|0.004733|0.005386	  |0.017442 |0.007046|0.005646
+
+Nous decidons après la comparaison du modèle (pluie7) avec le reste de modèles importants, de valider ce dernier. Nous pensions cependant par intuitions que les coeificients des variables (Temp.min et Press.mean) seraient positifs en imposant un impact sur la pluie de lendemain,mais d'après le résulats ,leurs coeficients sont négatifs donc nous allons essayer  d'améliorer  ultérieurement le modèle (pluie7) par exemple par le bisais des interactions.
+Verifions à présent les qualités explicatives en le comparant aux modèles $M_0$ et $M_{sat}$.
+
+### Test du rapport de vraissemblance.
+
+Le modèle (pluie7) peut-être comparé aux deux modèles êxtrèmes ($M_0$ et $M_{sat}$). On rappel que:
+* $M_0$ le modèlele nul dans lequel les $(Y_i)$ sont indépendantes et identiquement distribuées, ce qui équivaut à $\beta_1 = \beta_2 = ... = \beta_k =0$.
+
+ * $M_{sat}$ le modèlele saturé dans lequel il n’y a aucune structure aux ($p_i$).
+
+Les trois modèles sont imbriqués ($M_0 \subset pluie7 \subset M_{sat}$).
+On peut donc effectuer des **tests du $\chi^2$ de rapport de vraisemblance**.
+
+Null deviance: 1635.4  on 1179  degrees of freedom
+Residual deviance: 1299.6  on 1169  degrees of freedom
+
+```{r}
+pchisq(1635.4 - 1299.6, 1179 - 1169, lower = F)
+```
+
+Dans ce prémier cas,on obtient une p-valeur très faible : Nous rejette le modèle sans covariable. Notre modèle est donc utile. Comparons maintenant notre modèle au modèle saturé
+
+
+```{r}
+pchisq(1299.6, 1169, lower = F)
+```
+
+Dans ce second cas, la p-valeur est également faible. Notre modèle ne capture pas toute la variabilité de nos données.Nous devrions logiquement rejeter ce modèle au profit du modèle saturé, cependant nous decidons de le conserver pour le moment,car nous allons chercher à l'améliorer plus tard.
+
+### Qualité de modèle en terme de déviance
+
+Les modèles etant emboités,nous pouvons méner une étude comparative pour l'ensemble de nos modèles aux deux modèles extrêmes ($M_0$ et $M_{sat}$). Commencons par mettre tous nos modèles dans le même chunk comme suit:
+
+```{r,echo=FALSE}
+# modele pluie0
+pluie0 = glm(pluie.demain ~.,family = binomial ,data = met)
+#modele pluie1
+pluie1 = glm(pluie.demain~Year+Month+Day+Temp.mean+ Press.mean+Precipitation+Snowfall+Total.cloud.mean+
+High.cloud.mean+Med.cloud.mean+Low.cloud.mean+Sunshine+Radiation+Wind.speed.10m.mean
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.80m.min+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+#modele pluie2
+pluie2 = glm(pluie.demain~Year+Day+Temp.mean+ Press.mean+Precipitation+Snowfall+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Sunshine+Radiation+Wind.speed.10m.mean
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.80m.min+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+#modele pluie3
+pluie3 = glm(pluie.demain~Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Sunshine+Radiation+Wind.speed.10m.mean
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.80m.min+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+#modele pluie3b
+pluie3b = glm(pluie.demain~-1+Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Sunshine+Radiation+Wind.speed.10m.mean
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.80m.min+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+#modele pluie4
+pluie4 = glm(pluie.demain~Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Radiation
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.900.max+Wind.speed.900m.min
+ ,family = binomial,data = met)
+#modele pluie4.1
+pluie4.1 = glm(pluie.demain~Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Low.cloud.mean+Radiation
++Wind.direc.10.m+Wind.speed.80m.mean+Wind.direc.80.m+Wind.speed.900m.mean+
+Wind.direc.900.m+Wind.speed.10m.max+Wind.speed.10m.min
++Wind.speed.80.max+Wind.speed.900.max
+ ,family = binomial,data = met)
+#modelepluie5
+pluie5 = glm(pluie.demain~Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Radiation
++Wind.speed.80m.mean+Wind.direc.80.m+
+Wind.direc.900.m+Wind.speed.10m.max
++Wind.speed.900.max+Wind.speed.10m.min
+ ,family = binomial,data = met)
+#modele pluie6
+pluie6 = glm(pluie.demain~Year+Temp.mean+ Press.mean+Precipitation+Total.cloud.mean+
+Med.cloud.mean+Radiation
++Wind.speed.80m.mean+Wind.direc.80.m+
+Wind.direc.900.m+Wind.speed.10m.max
++Wind.speed.900.max+Wind.speed.10m.min
+ ,family = binomial,data = met)
+#modele pluie7
+pluie7 = glm(pluie.demain~Temp.mean+Temp.min+Press.mean+Total.cloud.mean+
+Med.cloud.mean
++Wind.speed.80m.mean+Wind.direc.80.m+
+Wind.direc.900.m+Wind.speed.10m.max
++Wind.speed.10m.min
+ ,family = binomial,data = met)
+
+```
+
+Le code ci-dessous réalise la comparaison de modèles nuls aux modèles saturés,affiche les résultats en terme de AIC et p-valeur dans un tableau recaptilatif 
+
+```{r,echo=FALSE}
+library(broom)
+library(dplyr)
+library(knitr)
+
+modèle=c(paste('pluie',0:4,sep=''),"pluie4.1",paste('pluie',5:7,sep=''))
+
+test_devi=function(model){
+
+  # modèle sans covariables
+  A=pchisq(summary(model)$null.deviance-summary(pluie7)$deviance,   summary(model)$df[1],
+lower = F)
+
+  # modèle saturé
+  B=pchisq(summary(model)$deviance,summary(model)$df[2], lower = F)
+  return(c(A,B))
+}
+
+df7=NULL ; df7a=NULL ; df7b=NULL
+for (i in (1:length(modèle))){
+  df7b=t(c(df7b,test_devi(get(modèle[i]))))
+  df7a=(c(df7a,AIC(get(modèle[i]))))
+}
+df7b=matrix(df7b,ncol=2,nrow=9, byrow = T)
+rownames(df7b)=modèle[1:length(modèle)]
+df7=cbind(df7b,df7a)
+colnames(df7)=c("Modèle nuls","vs Modèle saturés","AIC")
+kable(df7)
+```
+
+Aucun des modèles representés dans le tableau ci-dessus ne captent l'ensemble de la variablité de nos données ni n'offre le meilleur compromis entre **qualité** d'ajustement et **complexité**. On peut résumer cette partie en disant que le test de déviance montre que quelque soit le modèle avec lequel on le compare,le $M_{sat}$ apporte de l'information supplémentaire (la p-valeur n'est significative).
+
+### Recherche de meileur modèle avec la fonction step
+
+Cherchons maintenant le meilleur modèle de manière automatique
+
+### Meilleur modèle en terme de AIC proposé par la méthode backward
+
+```{r,eval=FALSE,echo=TRUE}
+# Meilleur modèle par la méthode backward.
+modelauto <- stepAIC(glm(pluie.demain ~ ., data = met, family = binomial(link="logit")),direction="backward", trace = F)
+summary(modelauto)
+
+```
+
+La fonction step avec la méthode "backward" nous fournit son meilleur modèle avec un AIC le plus faible(AIC: 1282.8 contre notre modèle pluie7 avec un AIC: 1321.6) et il est composé de 17 variables dont une(Snowfall) n'est pas significative et deux (Wind.direc.80.m  et Temp.min ) sont à la limite de seuil de significativité, contrairement à notre modèle(pluie7) qui ne contient que 10 variables + l'intercept et les variables choisies par le modèle automatique (méthode backward) sont les suivants:
+
+```{r,echo=TRUE,eval=FALSE}
+modelauto = glm(formula = pluie.demain ~ Year + Temp.mean + Press.mean + 
+    Snowfall + Med.cloud.mean + Wind.speed.80m.mean + Wind.direc.80.m + 
+    Wind.direc.900.m + Temp.min + Press.max + Press.min + Total.cloud.max + 
+    Total.cloud.min + Med.cloud.max + Wind.speed.10m.max + Wind.speed.10m.min + 
+    Gust.max, family = binomial(link = "logit"), data = met)
+#Null deviance: 1635.4  on 1179  degrees of freedom
+#Residual deviance: 1246.8  on 1162  degrees of freedom
+pchisq(1635.4 - 1246.8, 1179 - 1162, lower = F)
+print("Test du rapport de vraisemblance du modèle nul contre le modèlauto")
+# p-valeur très faible : on rejette le modèle sans covariable. Le modèle est utile.
+print("Test du rapport de vraisemblance du modle saturé contre le modèlauto")
+pchisq(1246.8, 1162, lower = F) # La p-valeur est faible.Le modèle doit être amélioré.
+```
+
+Le test de déviance montre que le modèle(modèleauto) proposé automatiquement par R non plus n'est pas satisfaisant(p-valeur<5%). On s'autorise donc à aller voir les modeèles automatiques avec les méthodes (,**forward**,**both**) toujours avec la fonction **step**.
+
+### Meilleur modèle en terme de AIC proposé par la méthodode forward
+
+```{r,eval=FALSE,echo=TRUE}
+modelauto1 <- stepAIC(glm(pluie.demain ~ ., data = met, family = binomial(link="logit")),direction="forward", trace = F)
+summary(modelauto1)
+#Null deviance: 1635.4  on 1179  degrees of freedom
+#Residual deviance: 1232.7  on 1136  degrees of freedom
+pchisq(1635.4 - 1232.7, 1179 - 1136, lower = F)
+print("Test du rapport de vraisemblance du modèle nul contre le modèlauto")
+# p-valeur très faible : on rejette le modèle sans covariable. Le modèle est utile.
+print("Test du rapport de vraisemblance du modle saturé contre le modèlauto")
+pchisq(1232.7, 1136, lower = F) # La p-valeur est faible.Le modèle doit être amélioré.
+```
+
+Cette méthode nous propose un modèle avec 43 variables dont plusieurs ne sont pas significatives et le test de deviance non plus n'est pas significatif. l'utlisation d'un nombre aussi important des variables dans un modèle, entrainerait un surapprentissage(surentrainement) de notre modèle donc c'est à éviter.
+
+### Meilleur modèle proposé en terme de AIC par la méthode both.
+
+```{r,eval=FALSE,echo=TRUE}
+modelauto2 <- stepAIC(glm(pluie.demain ~ ., data = met, family = binomial(link="logit")),direction="both", trace = F)
+summary(modelauto2)
+
+```
+
+**Conclusion**: Les deux méthodes (bacward et both) fournissent le même AIC:1282.8 ainsi que le même test de deviance:0.04165999 ,par contre, la méthode (forward) donne un AIC de 1320.7 qui est plus important que les deux premières méthodes et un test de  diviance encore plus faible:0.02341985 (presque deux fois moins). Les méthodes automatiques ne font donc pas mieux que notre modèle7 ajusté manuellement,voici un tableau recaptilatif qui résume les AIC et BIC de modèles automatiques et le modèle pluie7.
+
+```{r,eval=FALSE,echo=FALSE}
+AIC(pluie7)
+AIC(modelauto)
+AIC(modelauto1)
+AIC(modelauto2)
+BIC(pluie7)
+BIC(modelauto)
+BIC(modelauto1)
+BIC(modelauto2)
+```
+
+Modèles |AIC|$BIC$|
+------------|-------|-------|
+pluie7 |1321.612  |1377.418  |
+Modelauto(backward)|1282.847	|1374.166 |
+Modelauto1(forward)	|1320.696	|1543.92|
+Modelauto2(both)|1282.847 	|1374.166|
+
+D'après la comparaison de ces 4 modèles,nous decidons de choisir le modelauto(bakward) comme modèle de travil et on améliore.
+
+### Amélioration du modèle par interactions entre les variables
+
+### Ajustement du modelauto.a
+
+```{r,eval=FALSE,echo=TRUE}
+modelauto.a= glm(formula = pluie.demain ~ Year + (Temp.mean^2) + I(Press.mean) + 
+    I(Snowfall^2) + Med.cloud.mean + Wind.speed.80m.mean + (Wind.direc.80.m^2) + 
+    Wind.direc.900.m + Temp.min + Press.max + Press.min + Total.cloud.max + 
+    Total.cloud.min + Med.cloud.max + Wind.speed.10m.max + Wind.speed.10m.min + 
+    Gust.max, family = binomial(link = "logit"), data = met)
+summary(modelauto.a)
+test_devi(modelauto.a)
+```
+
+Le modèle est globalement satisfaisant avec presque la quasitotalité des valiables significatives,mais le test de déviance demerre toujours non significatif(p-valeur<5%). Nous decidons d'enlever certaines variables du modèle par intuitions.
+
+### Ajustement du modelauto.b
+
+On rétire du modèle les variables "(Snowfall)","Wind.direc.80.m" ainsi que "Temp.min" qui n'apportent pas d'information dans le modelauto.a
+
+```{r,eval=FALSE,echo=TRUE}
+modelauto.b= glm(formula = pluie.demain ~ Year + (Temp.mean^2) + I(Press.mean) + 
+      Med.cloud.mean + Wind.speed.80m.mean  + 
+    Wind.direc.900.m + Press.max + Press.min + Total.cloud.max + 
+    Total.cloud.min + Med.cloud.max + Wind.speed.10m.max + Wind.speed.10m.min + 
+    Gust.max, family = binomial(link = "logit"), data = met)
+summary(modelauto.b)
+test_devi(modelauto.b)
+```
+
+On remarque que l'AIC est encore plus grand par rapport au modèlauto.a et le test de deviance est très petit donc cette operation ne donne pas le résultats escompté. certaines variables qui etaient significatifs,ne le sont plus maintenant.On tente un dernier modèle.
+
+
+### Ajustement du modeleauto.c
+
+```{r,eval=FALSE,echo=TRUE}
+modelauto.c= glm(formula = pluie.demain ~Med.cloud.mean:Press.mean +Wind.speed.80m.mean +Wind.direc.900.m + Temp.min + Press.max*Press.min  + Total.cloud.max:Total.cloud.min*Med.cloud.max + Wind.speed.10m.max +Wind.speed.10m.min, family = binomial(link = "logit"), data = met)
+summary(modelauto.c)
+test_devi(modelauto.c)
+```
+
+Nos plusieurs tentatives pour améliorer le modèle par le biais des interactions n'ont pas donné de résultats satisfaisants donc nous changeons de methodes.nous allons considérer toutes les variables que le modèle automatqie a selectionnées pour créer une data frame et verifier les correlation entre les variables et nous retirerons tout siplement les variables fortement corrélées entre elles pour éviter les redondances d'informations.
+
+### Data frame avec 17 variabes proposées par le modèle automatique (fonction:step)
+
+Voici les 17 variables fournies par le modele step.
+
+```{r,eval=FALSE,echo=TRUE}
+# Matrice de correlation avec les variables du modèle
+modelstep = c("Year", "Temp.mean" , "Press.mean","Snowfall" , "Med.cloud.mean" ,"Wind.speed.80m.mean" ,"Wind.direc.80.m",
+    "Wind.direc.900.m" ,"Temp.min" ,"Press.max", "Press.min", "Total.cloud.max" ,"Total.cloud.min" , "Med.cloud.max", "Wind.speed.10m.max" ,"Wind.speed.10m.min" ,"Gust.max")
+select_model= met[, modelstep]
+select_model
+
+```
+
+### Corrélation entre les variables
+
+Ce code affiche la corrélation de variables deux à deux et affiche le résultat avec deux chiffres après la virgule.
+
+```{r,eval=FALSE,echo=TRUE}
+corr= round(cor(select_model),2)
+corr
+```
+
+### Visualisation graphique
+
+On peut également voir graphiquement la corrélation qui peut exister entre les variables (par exemple entre le temperature et la pression)
+
+```{r,echo=TRUE,eval=TRUE}
+cor.test(met$Temp.mean,met$Press.max)
+```
+
+On remarque une correlation forte (p-valeur très faible) et négative (l'intervalle de confiance ne contient pas de 0).Ce résultat nous laisse penser que la température et la pression ont tendance à évoluer en "variations opposées" (ce qui contredit notre intuition dans la partie etude descriptive).
+
+Pour la facilité de lecture, nous pouvons également afficher les 17 variables corréllées deux à deux. le rouge indique que la corrélation est négative,le blanc indique que la corrélation est faible et le vert indique une forte corrélation.
+
+```{r,eval=TRUE,echo=TRUE}
+modelstep = c("Year", "Temp.mean" , "Press.mean","Snowfall" , "Med.cloud.mean" ,"Wind.speed.80m.mean" ,"Wind.direc.80.m",
+    "Wind.direc.900.m" ,"Temp.min" ,"Press.max", "Press.min", "Total.cloud.max" ,"Total.cloud.min" , "Med.cloud.max", "Wind.speed.10m.max" ,"Wind.speed.10m.min" ,"Gust.max")
+select_model= met[, modelstep]
+corr= round(cor(select_model),2)
+cor_plot = ggcorrplot(corr = corr,hc.order= TRUE, 
+                       type="lower",lab = TRUE,lab_size=3,colors=c("red","white","green",
+                        title="Matrice de correlation",ggtheme = theme_bw))
+cor_plot
+```
+On observe que certaines variables comme pression(max,min et mean) ainsi que température(min,mean,max) sont parfaitement corréllées (presque 1) entre elles,ce qui laisse comprendre que le modèle automatique selectionne ses variables uniquelent en se basant sur l'AIC ,mais ne tient pas compte de l'autocorrélation entre les variables. Nous nous basons sur ce graphe pour ajuster notre modèle final.
+
+### Ajustement du modèle final
+
+```{r,echo=TRUE}
+modelautofinal= glm(pluie.demain ~ Temp.mean + Med.cloud.mean + Wind.speed.80m.mean +Press.max + Gust.max , family = binomial(link = "logit"), data = met)
+summary(modelautofinal)
+test_devi(modelautofinal)
+```
+
+On remarque que dans presque tous les modèles ajustés, la variables température moyenne(Temp.mean) et la variable couverture nuageuse à moyennes altitudes (Med.cloud.mean) ont toujours montré une p-valeur significative ainsi qu'un coeifficient positif,ce qui veut dire que à deux seuls,ces varaibles peuvent influencer la pluie de lendemain alors que la pression maximale avec son coeifficient négatif a un effet contraire sur la pluie de lendemain.
+
+
+### Courbe ROC,validation croisée et seuil optimal
+
+Compte tenu de résultats de test de déviance non significatifs en terme de p-valeur, nous 
+
+```{r}
+
+par(mfrow=c(1,2))
+# Les modèles considérés
+modelauto <- stepAIC(glm(pluie.demain ~ ., data = met, family = binomial(link="logit")),direction="backward", trace = F)
+
+modelauto.c= glm(formula = pluie.demain ~Med.cloud.mean:Press.mean +Wind.speed.80m.mean +Wind.direc.900.m + Temp.min + Press.max*Press.min  + Total.cloud.max:Total.cloud.min*Med.cloud.max + Wind.speed.10m.max +Wind.speed.10m.min, family = binomial(link = "logit"), data = met)
+
+modelautofinal= glm(pluie.demain ~ Temp.mean + Med.cloud.mean + Wind.speed.80m.mean +Press.max + Gust.max , family = binomial(link = "logit"), data = met)
+
+
+# Prédictions des différents modèles
+predmodelauto <- predict(modelauto, data = met, type = "response")
+predmodelauto.c <- predict(modelauto.c, data = met, type = "response")
+predmodelautofinal <- predict(modelautofinal, data = met, type = "response")
+
+# Véritables cible est la variable pluie.demain
+y_true <- met$pluie.demain
+
+# Calculer les courbes ROC et AUC pour chaque modèle
+roc_modelauto <- roc(y_true, predmodelauto)
+roc_modelauto_c <- roc(y_true, predmodelauto.c)
+roc_modelautofinal <- roc(y_true, predmodelautofinal)
+
+auc_modelauto <- auc(roc_modelauto)
+auc_modelauto_c <- auc(roc_modelauto_c)
+auc_modelautofinal <- auc(roc_modelautofinal)
+
+# Afficher les AUC
+print(paste("AUC Model Auto: ", auc_modelauto))
+print(paste("AUC Model Auto C: ", auc_modelauto_c))
+print(paste("AUC Model Auto Final: ", auc_modelautofinal))
+
+# Créer un dataframe pour ggplot
+roc_data <- data.frame(
+  TPR = c(roc_modelauto$sensitivities, roc_modelauto_c$sensitivities, roc_modelautofinal$sensitivities),
+  FPR = c(1 - roc_modelauto$specificities, 1 - roc_modelauto_c$specificities, 1 - roc_modelautofinal$specificities),
+  Model = factor(rep(c(sprintf("Model Auto (AUC = %.2f)", auc_modelauto), 
+                       sprintf("Model Auto C (AUC = %.2f)", auc_modelauto_c), 
+                       sprintf("Model Auto Final (AUC = %.2f)", auc_modelautofinal)), 
+                     times = c(length(roc_modelauto$sensitivities), 
+                               length(roc_modelauto_c$sensitivities), 
+                               length(roc_modelautofinal$sensitivities))))
+)
+
+# Tracer les courbes ROC avec ggplot2
+ggplot(roc_data, aes(x = FPR, y = TPR, color = Model)) +
+  geom_line() +
+  geom_abline(linetype = "dashed", color = "gray") +
+  labs(title = "Courbes ROC pour les differents modèles", x = "Faux positifs", y = "Vrais positifs") +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+
+# Déterminer le seuil optimal pour le modèle final (modelautofinal)
+seuil <- seq(0, 1, by = .00001)
+res <- rep(NA, length(seuil))
+for(i in 1:length(seuil)){
+  pred <- (predmodelautofinal >= seuil[i])
+  res[i] <- mean(abs(pred - y_true), na.rm = TRUE)
+}
+
+seuil_optimal <- seuil[which.min(res)]
+print(paste("Seuil optimal: ", seuil_optimal))
+
+# Prédictions au seuil optimal
+predmodelfinal <- (predmodelautofinal >= seuil_optimal)
+
+# Afficher la matrice de confusion au seuil optimal
+print("Matrice de confusion du modèle final au seuil optimal")
+print(table("PREDITS" = predmodelfinal, "OBSERVES" = y_true))
+
+# Calculer l'erreur moyenne
+erreur_moyenne <- mean(abs(predmodelfinal - y_true), na.rm = TRUE)
+print(paste("Erreur moyenne au seuil optimal: ", erreur_moyenne))
+
+# Calcul de l'accuracy
+accuracy <- mean(predmodelfinal == y_true)
+print(paste("Précision (Accuracy) au seuil optimal: ", accuracy))
+
+# Créer un tableau des résultats
+results_table <- data.frame(
+  Model = "Model Auto Final",
+  Seuil_Optimal = seuil_optimal,
+  Erreur_Moyenne = erreur_moyenne,
+  Accuracy = accuracy
+)
+
+print("Tableau des résultats :")
+print(results_table)
+
+```
+
+Nous avons tracé la courbe ROC de 3 modèles et on note un AUC de 0.82 pour le modèle automatqie(modelauto) avec la méthode backward,mais qui prend en consideration toutes les variables avec nombre d'ntres elles non significatives.Le deuxième est un modele (modelauto.c,AUC:0.80) avec les interactions entre les variables,mais il faut noter une bonne autocorrélation entre les variables de ce moèle et enfin un dernier modèle(modelautofinal,AUC:0.78) ,ajusté avec les variables faiblement corrélées entre elles. Techniquement,on peut dire c'est le modèle(auto) qu'il faut choir ,mais il y a un risque de surentrainement avec autant de variables bien qu'il est 4% plus performant que le modèle(modelautofinal),nous decidons de choir finalement le modèleautofinal dont je vous invite à voir dans le tableau ci-dessous le seuil optimal,l'erreur moyenne et sa précision.
+
+### Prédication pour le modèle final
+
+A présent,nous chargeons les données test.
+
+
+```{r,metpr0,echo=FALSE}
+metpr0 <- read.csv("~/Desktop/Module 2/Modèles linéaires généralisés/Projet/meteo.test.csv", header=TRUE,sep= ",")
+```
+
+
+```{r,echo=FALSE}
+names(metpr0)[names(metpr0) == "X"] <- "X"
+names(metpr0)[names(metpr0) == "Year"] <- "Year"
+names(metpr0)[names(metpr0) == "Month"] <- "Month"
+names(metpr0)[names(metpr0) == "Day"] <- "Day"
+names(metpr0)[names(metpr0) == "Hour"] <- "Hour"
+names(metpr0)[names(metpr0) == "Minute"] <- "Minute"
+names(metpr0)[names(metpr0) == "High.Cloud.Cover.daily.max..high.cld.lay."] <- "High.cloud.max"
+names(metpr0)[names(metpr0) == "High.Cloud.Cover.daily.mean..high.cld.lay."] <- "High.cloud.mean"
+names(metpr0)[names(metpr0) == "High.Cloud.Cover.daily.min..high.cld.lay."] <- "High.cloud.min"
+names(metpr0)[names(metpr0) == "Low.Cloud.Cover.daily.max..low.cld.lay."] <- "Low.cloud.max"
+names(metpr0)[names(metpr0) == "Low.Cloud.Cover.daily.mean..low.cld.lay."] <- "Low.cloud.mean"
+names(metpr0)[names(metpr0) == "Low.Cloud.Cover.daily.min..low.cld.lay."] <- "Low.cloud.min"
+names(metpr0)[names(metpr0) == "Mean.Sea.Level.Pressure.daily.max..MSL."] <- "Press.max"
+names(metpr0)[names(metpr0) == "Mean.Sea.Level.Pressure.daily.mean..MSL."] <- "Press.mean"
+names(metpr0)[names(metpr0) == "Mean.Sea.Level.Pressure.daily.min..MSL."] <- "Press.min"
+names(metpr0)[names(metpr0) == "Medium.Cloud.Cover.daily.max..mid.cld.lay."] <- "Med.cloud.max"
+names(metpr0)[names(metpr0) == "Medium.Cloud.Cover.daily.mean..mid.cld.lay."] <- "Med.cloud.mean"
+names(metpr0)[names(metpr0) == "Medium.Cloud.Cover.daily.min..mid.cld.lay."] <- "Med.cloud.min"
+names(metpr0)[names(metpr0) == "Relative.Humidity.daily.max..2.m.above.gnd."] <- "Hum.max"
+names(metpr0)[names(metpr0) == "Relative.Humidity.daily.mean..2.m.above.gnd."] <- "Hum.mean"
+names(metpr0)[names(metpr0) == "Relative.Humidity.daily.min..2.m.above.gnd."] <- "Hum.min"
+names(metpr0)[names(metpr0)== "Shortwave.Radiation.daily.sum..sfc."] <- "Radiation"
+names(metpr0)[names(metpr0) == "Snowfall.amount.raw.daily.sum..sfc."] <- "Snowfall"
+names(meteo)[names(metpr0) == "Sunshine.Duration.daily.sum..sfc."] <- "Sunshine"
+names(metpr0)[names(metpr0) == "Temperature.daily.max..2.m.above.gnd."] <- "Temp.max"
+names(metpr0)[names(metpr0) == "Temperature.daily.mean..2.m.above.gnd."] <- "Temp.mean"
+names(metpr0)[names(metpr0) == "Temperature.daily.min..2.m.above.gnd."] <- "Temp.min"
+names(metpr0)[names(metpr0) == "Total.Cloud.Cover.daily.max..sfc."] <- "Total.cloud.max"
+names(metpr0)[names(metpr0) == "Total.Cloud.Cover.daily.mean..sfc."] <- "Total.cloud.mean"
+names(metpr0)[names(metpr0) == "Total.Cloud.Cover.daily.min..sfc."] <- "Total.cloud.min"
+names(metpr0)[names(metpr0) == "Total.Precipitation.daily.sum..sfc."] <- "Precipitation"
+names(metpr0)[names(metpr0) == "Wind.Direction.daily.mean..10.m.above.gnd."] <- "Wind.direc.10.m"
+names(metpr0)[names(metpr0) == "Wind.Direction.daily.mean..80.m.above.gnd."] <- "Wind.direc.80.m"
+names(metpr0)[names(metpr0) == "Wind.Direction.daily.mean..900.mb."] <- "Wind.direc.900.m"
+names(metpr0)[names(metpr0) == "Wind.Gust.daily.max..sfc."] <- "Gust.max"
+names(metpr0)[names(metpr0) == "Wind.Gust.daily.mean..sfc."] <- "Gust.mean"
+names(metpr0)[names(metpr0) == "Wind.Gust.daily.min..sfc."] <- "Gust.min"
+names(metpr0)[names(metpr0) == "Wind.Speed.daily.max..10.m.above.gnd."] <- "Wind.speed.10m.max"
+names(metpr0)[names(metpr0) == "Wind.Speed.daily.max..80.m.above.gnd."] <- "Wind.speed.80.max"
+names(metpr0)[names(metpr0) == "Wind.Speed.daily.max..900.mb."] <- "Wind.speed.900.max"
+names(metpr0)[names(metpr0) == "Wind.Speed.daily.mean..10.m.above.gnd."] <- "Wind.speed.10m.mean"
+names(metpr0)[names(metpr0) == "Wind.Speed.daily.mean..80.m.above.gnd."] <- "Wind.speed.80m.mean"
+names(metpr0)[names(metpr0) == "Wind.Speed.daily.mean..900.mb."] <- "Wind.speed.900m.mean"
+names(metpr0)[names(metpr0) == "Wind.Speed.daily.min..10.m.above.gnd."] <- "Wind.speed.10m.min"
+names(metpr0)[names(metpr0) == "Wind.Speed.daily.min..80.m.above.gnd."] <- "Wind.speed.80m.min"
+names(metpr0)[names(metpr0) == "Wind.Speed.daily.min..900.mb."] <- "Wind.speed.900m.min"
+names(metpr0)
+```
+
+### Suppression des variables unitiles
+
+```{r,echo=FALSE}
+# Supprimer les colonnes inutiles (X, Hour, Minute)
+test <- metpr0[, !names(metpr0) %in% c("X", "Hour", "Minute")]
+```
+
+
+Voici l'objet metpr1 sans les variables X,Hour et Minute
+
+```{r}
+names(test)
+```
+
+### Prédiction et exportatiopn de résulats avec la probabilité associée
+
+Le code ci-dessous affiche TRUE la pluie de lendemain dès que la probat depasse 0.45 et FALSE sinon. Il crée égalelent une colonne praba_estimee et une colonne pluie.lendemain et affiche les résultats.
+
+```{r,echo=TRUE}
+resultat <- predict(modelautofinal,test,type = "response")
+resultat <- cbind(test,resultat)
+colnames(resultat)[colnames(resultat)=="resultat"] <- "Proba_estimee"
+resultat$pluie.lendemain<-ifelse(resultat$Proba_estimee>0.45,T,F)
+write.csv(resultat, file = "resultat_pluie.lendemain.csv", row.names =F)
+```
+
+### Conclusion.
+
+Nous avons annoncé ci-haut que le modèle (pluie7),ajusté manuellement pourrait être amélioré par le bais des interactions,mais on s'est rendu compte qu'il y avait une forte corrélations entre les variables dans ce modèle et quelques essayes non satisfaisants qui ne sont pas présentés dans ce rapport nous ont poussé à abonder ce modèle.
+Le modèle(modèlautofinal) que nous avons validé au fnal senble être le mieux.
+
+Et en fin, nous rappelons qu'en moyenne, la probabilité d'avoir de la pluie le lendemain est influencée par deux facteurs qui sont la température moyenne (Temp.mean) et la couverture nuageuse à moyennes altitudes (Med.cld.mean). Ces deux variables ont tendance à augmenter la probabilité que la variable pluie.demain soit positif le lendemain.
+
+### ANNEXES
+ Pour information, nous proposons ici le nuages des points ainsi que l'histogramme de chaque variables prises individuellement pour observer leurs apports sur la pluie de lendemain. Ce qui nous a permis de comprendre l'importance ou non des variables.
+ 
+### ANNEXES 1 Histogramme
+
+ On peut graphiquement observer l'apport individuel de toutes les variables,cependant,il faut avoir au moins deux variables pour predire la pluie de lendemain. prises individuellement,les variables ne donnent pas suffisament d'information pour affirmer qu'il va pleuvoir le lendemain.
+ 
+```{r,eval=FALSE,echo=TRUE}
+for (i in 2:(ncol(met)-3)){
+  hist <- histogram(~met[,i] | pluie.demain, data=met, type = "percent", col="grey", xlab=colnames(met[i]), breaks=10 )
+  quantil <-ggplot(met, aes(x = met[,i], fill = pluie.demain)) + 
+  labs(title = paste("Distribution de la variable",colnames(met[i]), sep=" "),
+       x = colnames(met[i]), y = "Fréquence",
+       fill = "Couleur",
+       subtitle = "Histogramme de distribution") +
+  geom_density(alpha = 0.4) + # Transparency
+  guides(fill = guide_legend(override.aes = list(alpha = 1)))
+   print(hist)
+   print(quantil)
+}
+rm(hist,quantil,i)
+```
+
+
+### ANNEXES 2 Nuage des points
+
+Nuages des points de variables en fonction de la pluie de demain. On remarque qu'aucune varible ne toute seule influencer de manière plus sure la pluie de lendemain.
+
+```{r,eval=FALSE,echo=TRUE}
+for (i in 2:(ncol(met)-2)){
+  nuages <- ggplot(data = met, mapping = aes(x = pluie.demain , y = met[,i], col=pluie.demain)) +  geom_point() +labs(x = "pluie de lendemain", y = colnames(met[i]))
+  print(nuages)}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
